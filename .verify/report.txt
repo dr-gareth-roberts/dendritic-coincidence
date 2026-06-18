@@ -1,0 +1,32 @@
+=== PASS 1 ===
+[OK] canvas 1120x928
+[OK] header rendered with title
+[OK] play button visible
+[OK] static canvas has 99.8% non-black pixels
+[OK] canvas stats: 1120x928, index=0
+
+=== PASS 2 ===
+[OK] playhead advancing mid-trial: 32.9 → 70.4 → 105.8 ms
+[OK] scrubber works, playhead at 32.5 ms (NMDA-peak window)
+[OK] trunk mildly depolarised, V=-55.30 mV at t=32.5ms
+[OK] soma depolarised to -62.40 mV at t=60ms — somatic response
+[OK] trunk V at t=60ms: -60.00 mV
+
+=== PASS 3 ===
+[OK] NMDA peak (t=32.5ms): trunk V=-55.3 mV, soma V=-62.5 mV
+[OK] trunk mildly depolarised during NMDA peak
+[OK] soma post-plateau (t=120ms): V = -63.9 mV
+[OK] peak canvas whole-frame avg RGB=(66, 54, 50); centre ROI avg RGB=(135, 121, 77); 17.80% bright; max=(255, 255, 202)
+[OK] static canvas: centre ROI avg RGB=(29, 15, 48); 0.25% bright; max=(178, 154, 109)
+[OK] centre ROI brightness +259.7% above static — voltage driving visible light
+
+=== PASS 4 ===
+[OK] sweep triggered
+[OK] sweep returned 21 points: ΔT = [-50, -40, -30, -20, -15, -10, -7, -5, -3, -2, 0, 2, 3, 5, 7, 10, 15, 20, 30, 40, 50] ms
+[OK] peak ratio = 29.13× at ΔT=0ms (supralinear)
+[OK] peak located at |ΔT|=0ms (within coincidence window)
+[OK] mean ratio at |ΔT|≥30ms = 0.59× (sublinear regime — inputs sum linearly)
+[OK] ratio at |ΔT|≥40ms (max 0.85×) < peak (29.13×) — curve falls off
+
+=== GLOBAL ===
+[OK] no console errors or page errors
