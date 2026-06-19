@@ -9,7 +9,7 @@
 
 import { useMemo } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
-import { OrbitControls, Stars } from '@react-three/drei'
+import { OrbitControls } from '@react-three/drei'
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing'
 import { KernelSize } from 'postprocessing'
 import { Color } from 'three'
@@ -115,8 +115,12 @@ export function NeuronScene(props: NeuronSceneProps) {
       gl={{ antialias: true, toneMappingExposure: 1.0, preserveDrawingBuffer: true }}
       style={{ background: 'radial-gradient(ellipse at center, #2a1245 0%, #1a0a2f 70%, #0a0510 100%)' }}
     >
-      {/* Subtle background depth — distant points, not a starfield */}
-      <Stars radius={2000} depth={400} count={300} factor={1.5} fade speed={0.2} />
+      {/* No background starfield: with the bloom luminanceThreshold at
+          0.08, the Star points themselves crossed the threshold and
+          contributed bright halos into the centre ROI, contaminating
+          the "bloom is voltage-driven" measurement. The radial-gradient
+          background is enough to give the scene depth without competing
+          with the neuron's own light. */}
       <SceneBackground />
 
       <ambientLight intensity={0.25} color="#4466aa" />

@@ -12,13 +12,27 @@ supralinearity ratio from −50 ms to +50 ms.
 
 The demo shows: at ΔT = 0 ms both synapses fire simultaneously, the
 apical trunk enters an NMDA plateau (V ≈ −55 mV, visibly brighter —
-bloom carries the voltage), and the soma emits a supralinear EPSP.
-The summed response is **~29× the linear sum of either input alone**.
-At ΔT = 30 ms the same two inputs sum sublinearly — small EPSPs, no
-plateau, no somatic response. The voltage is voltage-coloured onto
-the 3D neuron: resting deep blue, depolarised warm yellow, with
-the bloom around the neuron physically driven by membrane
-depolarisation.
+bloom carries the voltage), and the soma emits a supralinear EPSP
+that is large enough to fire an action potential. At ΔT = 30 ms the
+same two inputs sum sublinearly — small EPSPs, no plateau, no somatic
+response. The voltage is voltage-coloured onto the 3D neuron: resting
+deep blue, depolarised warm yellow, with the bloom around the neuron
+physically driven by membrane depolarisation.
+
+> **A note on the headline number.** The default parameter regime is
+> tuned so that a coincidence trial drives the soma all the way through
+> an AP. This makes the "supralinearity ratio" — peak paired-pulse soma
+> dV divided by the sum of single-input dVs — come out around ~29×,
+> because the AP is all-or-nothing while a single NMDA+AMPA synapse
+> alone produces only a sub-millivolt EPSP at the soma. This is
+> **qualitatively a different result** from the Polsky/Mel/Schiller 2004
+> Figure 2 supralinearity of ~1.2–3× measured on subthreshold EPSPs in
+> L2/3 basal dendrites. Our curve has the *same shape* (peak at small
+> |ΔT|, sublinear by |ΔT|≥20ms), but the magnitude is dominated by the
+> AP transition, not by NMDA plateau contribution to a subthreshold
+> EPSP. See `DESIGN.md` for the parameter sweep that produced this
+> regime, and the `nocoincidence` preset in the UI for the AMPA-only
+> control that proves NMDA is doing the work.
 
 ## What this is
 
@@ -33,10 +47,14 @@ depolarisation.
   watch the propagation wave travel from synapse → trunk → soma.
 
 The headline result: with default parameters, two synaptic inputs
-fired **simultaneously** (ΔT ≈ 0) produce a **supralinear somatic EPSP**
-that drives the soma to fire an action potential (peak ratio ~29×
-versus the linear sum of either input alone), while inputs fired
-**30 ms apart** produce only a sublinear summed response (ratio ~0.6×).
+fired **simultaneously** (ΔT ≈ 0) drive the apical trunk into an NMDA
+plateau and produce a **supralinear somatic EPSP** that is large
+enough to fire an action potential. Off-coincidence (|ΔT|≥20ms), the
+same inputs sum linearly to a small sublinear EPSP — no AP, no
+plateau. The shape of the curve (peak at small |ΔT|, sublinear
+beyond |ΔT|≈20ms) matches Polsky/Mel/Schiller 2004 Figure 2; the
+magnitude of the ratio is dominated by the AP transition (see the
+honesty note above), not by Polsky's subthreshold supralinearity.
 This is the dendritic coincidence-detection mechanism first
 characterised experimentally in Polsky, Mel & Schiller 2004 and
 modelled in Poirazi & Mel 2001.
@@ -128,10 +146,14 @@ The verifier asserts, for the default `coincidence` preset:
   by ambient light.
 - **Pass 4 (curve shape):** the automated sweep runs and must satisfy
   the Polsky/Mel/Schiller 2004 Figure 2 qualitative shape — peak
-  supralinearity ratio ≥ 1.2× at |ΔT| < 10 ms, ratio ≤ 1.1× at
-  |ΔT| ≥ 30 ms, and the ratio at |ΔT| ≥ 40 ms strictly below peak.
-  With the current defaults the peak is 29× at ΔT = 0 (the soma AP
-  fires) and the mean at |ΔT| ≥ 30 ms is 0.6× (sublinear regime).
+  supralinearity ratio ≥ 1.2× at |ΔT| < 10 ms, ratio at |ΔT|≈20 ms
+  ≤ 1.15×, mean ratio at |ΔT| ≥ 30 ms ≤ 1.1×, and the ratio at
+  |ΔT| ≥ 40 ms strictly below peak. With the current defaults the
+  peak is ~29× at ΔT = 0 (the soma AP fires) and the mean at
+  |ΔT| ≥ 30 ms is 0.6× (sublinear regime). The verifier also asserts
+  that all 21 expected ΔT points are present (no silent blowup drops),
+  the integrator produced zero blowups, and every ratio is finite —
+  all of which would have masked a broken sim under the old checks.
 
 The full report is written to `.verify/report.txt`.
 
@@ -160,6 +182,18 @@ See `DESIGN.md` for the full honesty section. The biggest:
 - **Polsky 2004 is on L2/3 somatosensory pyramidal basal dendrites,
   not CA1.** Poirazi & Mel 2001 is the CA1 modelling extension. Both
   are referenced; the framing here is precise.
+- **Visual propagation wave is decorative.** The bloom around the
+  neuron is driven by the simulated compartment voltages (resting
+  navy → depolarised yellow → AP-peak white, all from the actual V
+  trace), but `src/components/propagation.ts` also layers a Gaussian
+  "wave" travelling from each active synapse along the dendrites
+  during a trial. This wave is **visual art, not biophysics** — it is
+  added to the rendered V *for colour only* and never fed back into
+  the simulation. With the default parameters the wave contributes
+  roughly half of the centre-ROI brightness increase the verifier
+  measures during a coincidence trial; the other half is the actual
+  trunk depolarisation. If you are checking the sim, do not include
+  the wave in any "is the simulator doing X" test.
 
 ## Project structure
 

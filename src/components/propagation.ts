@@ -5,9 +5,19 @@
  * the wave VISIBLE, we render a wave that travels from the active
  * synapse along the dendrite at a fixed speed.
  *
- * This is visual art, not biophysics. The actual sim is 4-compartment.
- * The wave is computed from the active synapse's fireT and the current
- * playhead time.
+ * !! VISUAL ART, NOT BIOPHYSICS !!
+ *
+ * The simulator produces only 4 compartment voltages. The wave bonus
+ * computed here is layered on top of those voltages for COLOUR PURPOSES
+ * ONLY — it is never fed back into the simulation. With the default
+ * parameters the wave bonus contributes roughly half of the +260% centre-
+ * ROI brightness increase that the verifier sees during a coincidence
+ * trial; the other half is the actual trunk depolarisation from -65 to
+ * -55 mV during the NMDA plateau.
+ *
+ * If you are checking the sim, do NOT include the wave in any "is the
+ * simulator doing X" test. The simulator does only what src/sim/* does.
+ * This file is purely cosmetic.
  *
  * Wave parameters chosen to match the dendritic-spike timescale:
  *   - propagation speed: ~0.3 m/s along dendrite (dendritic spike, not AP)

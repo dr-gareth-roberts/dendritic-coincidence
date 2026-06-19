@@ -316,12 +316,42 @@ async function main(): Promise<void> {
   await page.screenshot({ path: join(OUT, 'pass2-propagation.png') })
   const trunkV60 = await readTrunkV(page)
   const somaV60 = await readSomaV(page)
-  if (somaV60 > -65 + 0.5) {
+  if (somaV60 > -65 + 5) {
     report(2, 'OK', `soma depolarised to ${somaV60.toFixed(2)} mV at t=60ms — somatic response`)
+  } else if (somaV60 > -65 + 0.5) {
+    // Small EPSP. Real but on the threshold of detection; old (too-lax)
+    // threshold lived here. Keep this as a WARN so we don't lose signal,
+    // but the headline check above is what gates the test.
+    report(2, 'WARN', `soma only mildly depolarised (${somaV60.toFixed(2)} mV at t=60ms) — synaptic integration weak`)
   } else {
-    report(2, 'WARN', `soma not depolarised (${somaV60} mV) — synaptic integration weak`)
+    report(2, 'FAIL', `soma not depolarised (${somaV60.toFixed(2)} mV at t=60ms) — no synaptic integration`)
   }
   report(2, 'OK', `trunk V at t=60ms: ${trunkV60.toFixed(2)} mV`)
+
+  // Better somatic-response check: read the peak somatic V over the whole
+  // trial, not at a single moment. The AP fires a few ms after the synapse
+  // (somaAP peak is around t=33-40ms for fireT1=30), so any single-time
+  // sample either lands before the AP or after it has decayed. A peak
+  // search over the trace catches the actual maximum.
+  const somaPeakResult = await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const store = (window as any).__dendriticStore
+    if (!store) return { peakV: -65, nSamples: 0 }
+    const t = store.getState().lastTrial
+    if (!t) return { peakV: -65, nSamples: 0 }
+    let peakV = -Infinity
+    for (const s of t.trace) {
+      if (s.V[0] > peakV) peakV = s.V[0]
+    }
+    return { peakV, nSamples: t.trace.length }
+  })
+  if (somaPeakResult.peakV > -65 + 5) {
+    report(2, 'OK', `soma peak V over trial = ${somaPeakResult.peakV.toFixed(2)} mV (full depolarisation including any AP, from ${somaPeakResult.nSamples} samples)`)
+  } else if (somaPeakResult.peakV > -65 + 0.5) {
+    report(2, 'WARN', `soma peak V over trial = ${somaPeakResult.peakV.toFixed(2)} mV (small subthreshold EPSP — AP not driven by this synapse pair)`)
+  } else {
+    report(2, 'FAIL', `soma peak V over trial = ${somaPeakResult.peakV.toFixed(2)} mV (no somatic response)`)
+  }
 
   // ============================================================
   // PASS 3 — AESTHETIC
@@ -449,17 +479,19 @@ async function main(): Promise<void> {
   // Wait for the sweep to finish. The store flips sweepLoading → false and
   // populates `sweep`. Polling every 250ms, max 30s.
   let sweep: { deltaT: number; ratio: number; paired: number }[] | null = null
+  let blowups = 0
   const sweepDeadline = Date.now() + 30_000
   while (Date.now() < sweepDeadline) {
     const result = await page.evaluate(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const store = (window as any).__dendriticStore
-      if (!store) return { loading: true, sweep: null }
+      if (!store) return { loading: true, sweep: null, blowups: 0 }
       const s = store.getState()
-      return { loading: s.sweepLoading, sweep: s.sweep }
+      return { loading: s.sweepLoading, sweep: s.sweep, blowups: s.sweepBlowups ?? 0 }
     })
     if (!result.loading && result.sweep && result.sweep.length > 0) {
       sweep = result.sweep
+      blowups = result.blowups
       break
     }
     await page.waitForTimeout(250)
@@ -474,10 +506,40 @@ async function main(): Promise<void> {
 
     report(4, 'OK', `sweep returned ${sweep.length} points: ΔT = [${sweep.map((p) => p.deltaT).join(', ')}] ms`)
 
-    // Locate the peak ratio (anywhere in the sweep)
+    // Assertion 0: the sweep must have produced all 21 expected points.
+    // A point being missing (e.g. r.blewUp silently dropped) used to pass.
+    const expectedCount = 21
+    if (sweep.length === expectedCount) {
+      report(4, 'OK', `sweep has all ${expectedCount} expected ΔT points (no blowups dropped)`)
+    } else {
+      report(4, 'FAIL', `sweep has ${sweep.length} points, expected ${expectedCount} (blowups or errors dropped points)`)
+    }
+
+    // Assertion 0b: the store-level blowup counter must be zero. With the
+    // new blowup handling in runSweep, blowup points are kept in the sweep
+    // array (with ratio=NaN) and counted here, so the verifier fails fast.
+    if (blowups === 0) {
+      report(4, 'OK', 'no integrator blowups during sweep')
+    } else {
+      report(4, 'FAIL', `${blowups} sweep point(s) blew up the integrator — sim is unstable`)
+    }
+
+    // Assertion 0c: every ratio must be finite. A NaN ratio would let
+    // Math.max(...) return NaN and the comparison `NaN < peakRatio`
+    // evaluate to false, accidentally passing the "curve falls off" test.
+    const nanPoints = sweep.filter((p) => !Number.isFinite(p.ratio))
+    if (nanPoints.length === 0) {
+      report(4, 'OK', 'all sweep ratios are finite numbers')
+    } else {
+      report(4, 'FAIL', `${nanPoints.length} sweep point(s) have non-finite ratio (NaN/Inf): ΔT = [${nanPoints.map((p) => p.deltaT).join(', ')}]`)
+    }
+
+    // Locate the peak ratio. Skip non-finite points so a single NaN can't
+    // make the peak undefined.
     let peakRatio = 0
     let peakDT = 0
     for (const p of sweep) {
+      if (!Number.isFinite(p.ratio)) continue
       if (p.ratio > peakRatio) {
         peakRatio = p.ratio
         peakDT = p.deltaT
@@ -502,7 +564,8 @@ async function main(): Promise<void> {
     }
 
     // Assertion 3: ratio at |ΔT|≥30 must be near 1.0 (sublinear regime).
-    const farPoints = sweep.filter((p) => Math.abs(p.deltaT) >= 30)
+    // Use only finite points; a NaN would otherwise contaminate the mean.
+    const farPoints = sweep.filter((p) => Math.abs(p.deltaT) >= 30 && Number.isFinite(p.ratio))
     if (farPoints.length === 0) {
       report(4, 'WARN', 'sweep contains no |ΔT|≥30ms points — cannot assert sublinear regime')
     } else {
@@ -515,13 +578,28 @@ async function main(): Promise<void> {
     }
 
     // Assertion 4: ratio at |ΔT|≥40 must be < peak (monotone-ish decay).
-    const veryFar = sweep.filter((p) => Math.abs(p.deltaT) >= 40)
+    const veryFar = sweep.filter((p) => Math.abs(p.deltaT) >= 40 && Number.isFinite(p.ratio))
     if (veryFar.length > 0) {
       const maxFar = Math.max(...veryFar.map((p) => p.ratio))
       if (maxFar < peakRatio) {
         report(4, 'OK', `ratio at |ΔT|≥40ms (max ${maxFar.toFixed(2)}×) < peak (${peakRatio.toFixed(2)}×) — curve falls off`)
       } else {
         report(4, 'FAIL', `ratio at |ΔT|≥40ms (${maxFar.toFixed(2)}×) not below peak (${peakRatio.toFixed(2)}×) — curve doesn't decay`)
+      }
+    }
+
+    // Assertion 5 (new): ratio at exactly ΔT=20ms (or nearest sample) must
+    // be near 1.0 — the README's qualitative claim is that the curve
+    // "falls to ~1.0 by |ΔT| ≈ 20ms". A genuinely supralinear curve has
+    // the sublinear regime kicking in by then.
+    const near20 = sweep
+      .filter((p) => Number.isFinite(p.ratio))
+      .sort((a, b) => Math.abs(Math.abs(a.deltaT) - 20) - Math.abs(Math.abs(b.deltaT) - 20))[0]
+    if (near20) {
+      if (near20.ratio <= 1.15) {
+        report(4, 'OK', `ratio at |ΔT|≈20ms (ΔT=${near20.deltaT}) = ${near20.ratio.toFixed(2)}× (curve has returned to linear by 20ms)`)
+      } else {
+        report(4, 'FAIL', `ratio at |ΔT|≈20ms (ΔT=${near20.deltaT}) = ${near20.ratio.toFixed(2)}× (expected ≤1.15× — coincidence window too broad)`)
       }
     }
   }

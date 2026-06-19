@@ -97,6 +97,13 @@ export interface AppState {
   lastTrial: TrialResult | null
   sweep: SweepPoint[] | null
   sweepLoading: boolean
+  /** Monotonic counter incremented on every runSweep call. Used to drop
+   *  results from a superseded sweep (user double-clicked Sweep, or
+   *  params changed mid-sweep). */
+  sweepGeneration: number
+  /** Count of sweep points where the integrator blew up. The verifier
+   *  fails if this is > 0. */
+  sweepBlowups: number
   /** Playhead time (ms) for the last trial — driven by the playback hook. */
   playhead: number
   /** Fire time of synapse 1 in the last trial (ms). Null if syn1Mode === 'off'. */
@@ -193,6 +200,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   lastTrial: null,
   sweep: null,
   sweepLoading: false,
+  sweepGeneration: 0,
+  sweepBlowups: 0,
   playhead: 0,
   syn1FireT: null,
   syn2FireT: null,
@@ -241,12 +250,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   runSweep: () => {
-    set({ sweepLoading: true })
+    // Generation counter: if the user fires a second sweep while the first
+    // is in flight (or changes params mid-sweep), only the latest call's
+    // result is allowed to update store state. Without this, a fast double
+    // click on Sweep could overwrite a valid result with one based on
+    // already-stale params.
+    const myGen = (get().sweepGeneration ?? 0) + 1
+    set({ sweepLoading: true, sweepGeneration: myGen })
     setTimeout(() => {
+      if (get().sweepGeneration !== myGen) return // superseded
       const { params, overrides } = get()
       const dt = 0.01
       const deltaTs = [-50, -40, -30, -20, -15, -10, -7, -5, -3, -2, 0, 2, 3, 5, 7, 10, 15, 20, 30, 40, 50]
       const sweep: SweepPoint[] = []
+      let blowupCount = 0
 
       // Baselines
       const syn1 = new Neuron(buildNeuronParams(overrides))
@@ -255,16 +272,30 @@ export const useAppStore = create<AppState>((set, get) => ({
       const s2 = syn2.runTrial(params.trialDuration, dt, makeInputs({ ...params, syn1Mode: 'off' }, -1, params.fireT1))
       const sumBaseline = peakEPSP(s1, params.fireT1) + peakEPSP(s2, params.fireT1)
       for (const dT of deltaTs) {
+        if (get().sweepGeneration !== myGen) return // superseded mid-loop
         const fireT2 = params.fireT1 + dT
         const n = new Neuron(buildNeuronParams(overrides))
         const r = n.runTrial(params.trialDuration, dt, makeInputs(params, params.fireT1, fireT2))
-        if (r.blewUp) continue
+        if (r.blewUp) {
+          // Track blowups explicitly (ratio = NaN) instead of silently
+          // dropping the point. The verifier now fails if any point is
+          // missing or has a non-finite ratio.
+          blowupCount++
+          sweep.push({ deltaT: dT, ratio: Number.NaN, paired: Number.NaN })
+          continue
+        }
         const peak = peakEPSP(r, Math.min(params.fireT1, fireT2))
-        const ratio = sumBaseline > 0.01 ? peak / sumBaseline : 0
+        // Guard: only meaningful if the baseline is non-trivial. With
+        // AMPA-only or with very small weights, sumBaseline may be ~0 and
+        // the ratio is meaningless (or 0/0 = NaN). Mark such sweeps as
+        // ratio = 0 so the verifier can flag it.
+        const ratio =
+          sumBaseline > 0.01 && Number.isFinite(peak) ? peak / sumBaseline : 0
         sweep.push({ deltaT: dT, ratio, paired: peak })
       }
 
-      set({ sweep, sweepLoading: false })
+      if (get().sweepGeneration !== myGen) return // superseded
+      set({ sweep, sweepLoading: false, sweepBlowups: blowupCount })
     }, 50)
   },
 

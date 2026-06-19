@@ -6,11 +6,12 @@
 [OK] canvas stats: 1120x928, index=0
 
 === PASS 2 ===
-[OK] playhead advancing mid-trial: 32.9 → 70.4 → 105.8 ms
+[OK] playhead advancing mid-trial: 30.5 → 65.9 → 101.4 ms
 [OK] scrubber works, playhead at 32.5 ms (NMDA-peak window)
 [OK] trunk mildly depolarised, V=-55.30 mV at t=32.5ms
-[OK] soma depolarised to -62.40 mV at t=60ms — somatic response
+[WARN] soma only mildly depolarised (-62.40 mV at t=60ms) — synaptic integration weak
 [OK] trunk V at t=60ms: -60.00 mV
+[OK] soma peak V over trial = 45.19 mV (full depolarisation including any AP, from 30001 samples)
 
 === PASS 3 ===
 [OK] NMDA peak (t=32.5ms): trunk V=-55.3 mV, soma V=-62.5 mV
@@ -23,10 +24,14 @@
 === PASS 4 ===
 [OK] sweep triggered
 [OK] sweep returned 21 points: ΔT = [-50, -40, -30, -20, -15, -10, -7, -5, -3, -2, 0, 2, 3, 5, 7, 10, 15, 20, 30, 40, 50] ms
+[OK] sweep has all 21 expected ΔT points (no blowups dropped)
+[OK] no integrator blowups during sweep
+[OK] all sweep ratios are finite numbers
 [OK] peak ratio = 29.13× at ΔT=0ms (supralinear)
 [OK] peak located at |ΔT|=0ms (within coincidence window)
 [OK] mean ratio at |ΔT|≥30ms = 0.59× (sublinear regime — inputs sum linearly)
 [OK] ratio at |ΔT|≥40ms (max 0.85×) < peak (29.13×) — curve falls off
+[OK] ratio at |ΔT|≈20ms (ΔT=-20) = 1.05× (curve has returned to linear by 20ms)
 
 === GLOBAL ===
 [OK] no console errors or page errors
