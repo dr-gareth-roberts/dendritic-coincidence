@@ -25,7 +25,9 @@ export function References() {
             target="_blank"
             rel="noreferrer"
           >
-            CA1 compartmental model; the "neuron as a 2-layer network."
+            Theoretical foundation for the two-layer-network view of
+            pyramidal neurons (the actual CA1 compartmental model is in
+            Poirazi, Brannon &amp; Mel 2003, <em>Neuron</em> 37:977).
           </a>
         </li>
         <li>

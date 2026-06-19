@@ -60,5 +60,5 @@ export function voltageToLight(V: number): VoltageLight {
 
 /** Format voltage as a short string. */
 export function formatV(V: number): string {
-  return `${V >= 0 ? '+' : ''}${V.toFixed(1)} mV`
+  return `${V > 0 ? '+' : ''}${V.toFixed(1)} mV`
 }

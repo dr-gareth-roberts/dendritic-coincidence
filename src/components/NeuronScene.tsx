@@ -8,7 +8,7 @@
  */
 
 import { useMemo } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
+import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing'
 import { KernelSize } from 'postprocessing'
@@ -31,16 +31,7 @@ export interface SynapseFire {
   amplitude: number
 }
 
-/** Set the WebGL clear color and scene background so the deep-purple radial
- * gradient is visible. The Canvas style gradient only shows where the renderer
- * leaves pixels transparent; with the EffectComposer we need a real color. */
-function SceneBackground(): null {
-  const { scene, gl } = useThree()
-  // Deep purple core → near-black edges. Matches the CSS gradient.
-  scene.background = new Color('#1a0a2f')
-  gl.setClearColor(new Color('#1a0a2f'), 1)
-  return null
-}
+/** Set the WebGL clear color and scene background. Now done in onCreated. */
 
 interface NeuronSceneProps {
   /** Per-compartment voltages (mV) at the current playhead. */
@@ -113,6 +104,16 @@ export function NeuronScene(props: NeuronSceneProps) {
       camera={{ position: [380, 240, 620], fov: 45 }}
       dpr={[1, 2]}
       gl={{ antialias: true, toneMappingExposure: 1.0, preserveDrawingBuffer: true }}
+      onCreated={({ scene, gl }) => {
+        // Deep purple core → near-black edges. Matches the CSS gradient.
+        // The Canvas style gradient only shows where the renderer leaves
+        // pixels transparent; with the EffectComposer we need a real color.
+        // r3f's `scene` is read-only-ish in v9, so doing this in onCreated
+        // (which runs once at mount, before any react-hooks lint checks
+        // complain) is the canonical place.
+        scene.background = new Color('#1a0a2f')
+        gl.setClearColor(new Color('#1a0a2f'), 1)
+      }}
       style={{ background: 'radial-gradient(ellipse at center, #2a1245 0%, #1a0a2f 70%, #0a0510 100%)' }}
     >
       {/* No background starfield: with the bloom luminanceThreshold at
@@ -121,7 +122,6 @@ export function NeuronScene(props: NeuronSceneProps) {
           the "bloom is voltage-driven" measurement. The radial-gradient
           background is enough to give the scene depth without competing
           with the neuron's own light. */}
-      <SceneBackground />
 
       <ambientLight intensity={0.25} color="#4466aa" />
       <pointLight position={[400, 400, 600]} intensity={0.6} color="#ffffff" />

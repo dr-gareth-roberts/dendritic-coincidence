@@ -114,27 +114,6 @@ export interface SynapseResult {
 }
 
 /**
- * Compute AMPA + NMDA current density at time t for all events on a compartment.
- */
-export function synapticCurrentAt(
-  t: number,
-  events: SynapseEvent[]
-): SynapseResult {
-  let I_AMPA = 0
-  let I_NMDA = 0
-  for (const e of events) {
-    const dt = t - e.fireT
-    if (dt < 0) continue
-    const gA = ampaConductance(dt, e.wAMPA)
-    const gN = nmdaConductance(dt, e.wNMDA)
-    // Placeholder at V = 0; the V-dependent version below is what's used in sim.
-    I_AMPA += gA * E_AMPA * 1e-2
-    I_NMDA += gN * mgBlock(0) * E_NMDA * 1e-2
-  }
-  return { I_AMPA, I_NMDA }
-}
-
-/**
  * Compute AMPA + NMDA current at time t given current voltage V. This is
  * the V-dependent version, used by the simulation step.
  *

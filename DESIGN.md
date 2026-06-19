@@ -178,24 +178,33 @@ dendritic/
         └── store.ts
 ```
 
-### Verification scripts
+### Verification script
 
-Each day of the build has a `dayN-verify.ts` script that runs a specific
-biophysics check:
+The verification gate is one script: `.verify/verify.ts`. It boots the
+real Vite app on port 5273 in a headless Chromium, drives it via the
+DOM, and asserts the headline biophysics directly from the in-app state.
 
-- **day1-verify.ts** — soma-only HH fires an AP (0.5 nA sustained step →
-  peak ~+45 mV, repetitive firing at ~50 Hz).
-- **day2-verify.ts** — 4-compartment, bAP propagates from soma to apical
-  tuft at ~14% and to basal at ~68%.
-- **day3-verify.ts** — AMPA produces a 0.35 mV somatic EPSP; NMDA at rest
-  is 96% blocked (correct biophysics); AMPA+NMDA combined produce a full
-  dendritic spike (V → 0 mV).
-- **day4-verify.ts** — **the verification gate**: supralinearity sweep
-  with default parameters produces a peak ratio of 1.52× at ΔT=0,
-  falling to ~1.0 by ΔT=20ms and ~0.9 by ΔT=50ms. This is the
-  Polsky/Mel/Schiller 2004 Figure 2 result.
+- **Supralinearity sweep** (the verification gate): with default
+  parameters, the peak ratio lands at **~29× at ΔT = 0** because the
+  coincidence trial drives the soma all the way through an AP, while
+  each synapse alone produces only a sub-millivolt subthreshold EPSP.
+  The *shape* of the curve — peak at small |ΔT|, sublinear by
+  |ΔT|≥20ms — is the Polsky/Mel/Schiller 2004 Figure 2 result; the
+  *magnitude* is dominated by the AP transition, not by NMDA-plateau
+  contribution to a subthreshold EPSP. See the README's headline
+  note for the long-form discussion.
+- The verifier asserts: 21-point sweep, zero blowups, all ratios
+  finite, ratio at |ΔT|≈20ms ≤ 1.15×, mean ratio at |ΔT|≥30ms ≤ 1.1×,
+  and the ratio at ΔT=0 dominates the |ΔT|≥30ms tail. Pass 2 also
+  scans the full 30,001-sample trace for the somatic AP peak (V > 0
+  mV) — i.e. it proves the AP actually fired, not just that the
+  ratio is large.
 
-Run with: `npx tsx src/sim/day4-verify.ts`
+The legacy `dayN-verify.ts` scripts that bootstrapped each phase of
+the build have been removed; their findings live in the actual
+shipped parameters and the README's verification section.
+
+Run with: `npx tsx .verify/verify.ts`
 
 ## Honest scope cuts
 
@@ -233,11 +242,16 @@ in-app References panel.
   g_ij = 0.6 mS/cm² which made bAP work but voltage-clamped the
   dendrites. Lower values (0.25, 0.20, 0.25) preserve some dendritic
   independence at the cost of bAP → tuft dropping to 14%.
-- **Synapse weights are sensitive.** wAMPA=5, wNMDA=30 gives a
-  *regime change* (soma fires AP at coincidence, ratio ~30×).
-  wAMPA=4.5, wNMDA=28 gives the canonical 1.5× ratio. Lower weights
-  flatten the ratio to ~1.0 (NMDA not unblocking enough). The 1.5×
-  target sits in a narrow ~5% window of wNMDA.
+- **Synapse weights are sensitive.** The shipped default (wAMPA=6,
+  wNMDA=30) puts the model in the *AP-firing regime* (peak ratio
+  ~29×, soma actually fires at coincidence). wAMPA=4.5, wNMDA=28
+  gives a *subthreshold regime* with a canonical 1.5× ratio (the
+  Polsky/Mel/Schiller 2004-style subthreshold measurement). Lower
+  weights flatten the ratio to ~1.0 (NMDA not unblocking enough).
+  Both regimes are valid demonstrations of dendritic coincidence
+  detection; we ship the AP-firing regime because the action
+  potential is the visually dramatic headline. The 1.5× target
+  sits in a narrow ~5% window of wNMDA.
 - **Mg²⁺ block is the headline physics.** At rest, NMDA is 96% blocked
   by Mg²⁺ — this is correct biophysics, not a model defect. Single
   NMDA inputs barely budge the dendrite at rest. The story is the

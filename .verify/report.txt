@@ -6,7 +6,7 @@
 [OK] canvas stats: 1120x928, index=0
 
 === PASS 2 ===
-[OK] playhead advancing mid-trial: 30.5 → 65.9 → 101.4 ms
+[OK] playhead advancing mid-trial: 28.3 → 61.6 → 92.8 ms
 [OK] scrubber works, playhead at 32.5 ms (NMDA-peak window)
 [OK] trunk mildly depolarised, V=-55.30 mV at t=32.5ms
 [WARN] soma only mildly depolarised (-62.40 mV at t=60ms) — synaptic integration weak

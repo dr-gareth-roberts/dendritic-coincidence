@@ -25,11 +25,12 @@ const V_MAX = 50
 export function VoltageTrace({ trial, height = 220, playhead, onScrub }: VoltageTraceProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  useEffect(() => {
+  function drawTrace(): void {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+    if (canvas.clientWidth === 0 || canvas.clientHeight === 0) return
 
     const dpr = window.devicePixelRatio || 1
     const cssWidth = canvas.clientWidth
@@ -150,7 +151,32 @@ export function VoltageTrace({ trial, height = 220, playhead, onScrub }: Voltage
       ctx.fillStyle = '#aaaacc'
       ctx.fillText(COMPARTMENT_NAMES[c], padL + plotW - 78, padT + 12 + c * 12)
     }
+  }
+
+  useEffect(() => {
+    drawTrace()
+    // drawTrace reads the latest trial/height/playhead via closure on each
+    // call; we want the closure to capture current values, not memoize.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trial, height, playhead])
+
+  // ResizeObserver: re-run the draw when the canvas's CSS size changes
+  // (window resize, sidebar collapse, etc). Without this the canvas keeps
+  // its old pixel buffer and the trace stretches or blurs.
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ro = new ResizeObserver(() => {
+      const w = canvas.clientWidth
+      const h = canvas.clientHeight
+      if (w > 0 && h > 0) drawTrace()
+    })
+    ro.observe(canvas)
+    return () => ro.disconnect()
+    // drawTrace reads the latest trial/playhead via closure on each call;
+    // we re-create the observer on trial change so the closure is fresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trial])
 
   function handleClick(e: React.MouseEvent<HTMLCanvasElement>): void {
     if (!onScrub || !trial) return
@@ -159,8 +185,15 @@ export function VoltageTrace({ trial, height = 220, playhead, onScrub }: Voltage
     const rect = canvas.getBoundingClientRect()
     const padL = 36
     const padR = 12
+    const padT = 16
+    const padB = 24
     const plotW = rect.width - padL - padR
+    const plotH = rect.height - padT - padB
     const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    // Reject clicks outside the plot rectangle so the y-axis ticks, the
+    // x-axis label, and the legend don't trigger an accidental scrub.
+    if (x < padL || x > padL + plotW || y < padT || y > padT + plotH) return
     const frac = Math.max(0, Math.min(1, (x - padL) / plotW))
     onScrub(frac * trial.duration)
   }

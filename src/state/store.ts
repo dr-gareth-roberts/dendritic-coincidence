@@ -20,7 +20,7 @@ import {
 } from '../sim/neuron'
 import type { SynapseEvent } from '../sim/synapse'
 import type { SynapseMode } from '../components/SynapseHandle'
-import { SOMA_PARAMS, APICAL_TRUNK_PARAMS, APICAL_TUFT_PARAMS, BASAL_PARAMS, type HHParams } from '../sim/hh'
+import { V_REST, SOMA_PARAMS, APICAL_TRUNK_PARAMS, APICAL_TUFT_PARAMS, BASAL_PARAMS, type HHParams } from '../sim/hh'
 import { DEFAULT_AXIAL, type AxialCoupling } from '../sim/cable'
 import { DEFAULT_KINETICS, type SynapseKinetics } from '../sim/synapse'
 
@@ -104,8 +104,6 @@ export interface AppState {
   /** Count of sweep points where the integrator blew up. The verifier
    *  fails if this is > 0. */
   sweepBlowups: number
-  /** Playhead time (ms) for the last trial — driven by the playback hook. */
-  playhead: number
   /** Fire time of synapse 1 in the last trial (ms). Null if syn1Mode === 'off'. */
   syn1FireT: number | null
   /** Fire time of synapse 2 in the last trial (ms). Null if syn2Mode === 'off'. */
@@ -118,7 +116,6 @@ export interface AppState {
   resetOverrides: () => void
   runTrial: () => void
   runSweep: () => void
-  setPlayhead: (t: number) => void
   cycleSynapse1: () => void
   cycleSynapse2: () => void
 }
@@ -181,7 +178,7 @@ function peakEPSP(result: TrialResult, fireT: number): number {
   const fireIdx = Math.max(0, Math.round((fireT - 1) / dt))
   let peak = 0
   for (let i = fireIdx; i < result.trace.length; i++) {
-    const dV = result.trace[i].V[0] - (-65)
+    const dV = result.trace[i].V[0] - V_REST
     if (dV > peak) peak = dV
   }
   return peak
@@ -202,7 +199,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   sweepLoading: false,
   sweepGeneration: 0,
   sweepBlowups: 0,
-  playhead: 0,
   syn1FireT: null,
   syn2FireT: null,
 
@@ -243,7 +239,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     const result = neuron.runTrial(params.trialDuration, 0.01, inputs)
     set({
       lastTrial: result,
-      playhead: 0,
       syn1FireT: params.syn1Mode !== 'off' ? params.fireT1 : null,
       syn2FireT: params.syn2Mode !== 'off' ? fireT2 : null,
     })
@@ -297,12 +292,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (get().sweepGeneration !== myGen) return // superseded
       set({ sweep, sweepLoading: false, sweepBlowups: blowupCount })
     }, 50)
-  },
-
-  setPlayhead: (t) => {
-    const { lastTrial } = get()
-    const clamped = Math.max(0, Math.min(lastTrial?.duration ?? 0, t))
-    set({ playhead: clamped })
   },
 
   cycleSynapse1: () => {

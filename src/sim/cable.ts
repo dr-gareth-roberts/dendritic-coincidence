@@ -40,7 +40,9 @@ export interface AxialCoupling {
  *   2. Allow dendritic inputs to produce local depolarisation without being
  *      voltage-clamped to the resting soma.
  *
- * Final values are empirical; see src/sim/day2-verify.ts and day3-verify.ts.
+ * Final values are empirical; the original tuning exploration is in
+ * `git log -- src/sim/day*-verify.ts` (those scripts have since been
+ * removed; their conclusions live here).
  */
 export const DEFAULT_AXIAL: AxialCoupling = {
   g_st: 0.25, // soma ↔ apical trunk

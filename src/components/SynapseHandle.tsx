@@ -111,7 +111,7 @@ export function SynapseHandle({
   const displayV = localV !== undefined ? localV : voltage
 
   return (
-    <group position={position}>
+    <group position={position} onClick={handleClick}>
       {/* Outer firing-event ring */}
       <mesh ref={ringRef}>
         <torusGeometry args={[14, 2.5, 10, 40]} />
@@ -125,7 +125,7 @@ export function SynapseHandle({
         />
       </mesh>
       {/* Inner glowing sphere */}
-      <mesh onClick={handleClick}>
+      <mesh>
         <sphereGeometry args={[9, 24, 18]} />
         <meshStandardMaterial
           ref={innerMatRef}

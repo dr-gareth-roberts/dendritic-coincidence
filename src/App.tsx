@@ -16,7 +16,7 @@
  *   - currentT: the playhead (so propagation waves travel from fire times)
  */
 
-import { useMemo } from 'react'
+import { Component, Suspense, useMemo } from 'react'
 import { NeuronScene } from './components/NeuronScene'
 import { VoltageTrace } from './components/VoltageTrace'
 import { SupralinearityPlot, type SweepPoint } from './components/SupralinearityPlot'
@@ -28,8 +28,36 @@ import { usePlayback, voltagesAt } from './components/playback'
 import { useAppStore } from './state/store'
 import './styles.css'
 
+/** Top-level error boundary. A bad leva value, a malformed trial, or
+ *  a r3f WebGL context loss shouldn't take the whole page down — it
+ *  should show a message in the panel that crashed. */
+class PanelErrorBoundary extends Component<
+  { name: string; children: React.ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null }
+  static getDerivedStateFromError(error: Error): { error: Error } {
+    return { error }
+  }
+  componentDidCatch(error: Error): void {
+    console.error(`[PanelErrorBoundary] ${this.props.name} crashed:`, error)
+  }
+  render(): React.ReactNode {
+    if (this.state.error) {
+      return (
+        <section className="panel error">
+          <h2>{this.props.name} crashed</h2>
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: '11px' }}>
+            {this.state.error.message}
+          </pre>
+        </section>
+      )
+    }
+    return this.props.children
+  }
+}
+
 export default function App() {
-  const params = useAppStore((s) => s.params)
   const trial = useAppStore((s) => s.lastTrial)
   const sweep = useAppStore((s) => s.sweep)
   const sweepLoading = useAppStore((s) => s.sweepLoading)
@@ -37,6 +65,13 @@ export default function App() {
   const syn2FireT = useAppStore((s) => s.syn2FireT)
   const cycleSynapse1 = useAppStore((s) => s.cycleSynapse1)
   const cycleSynapse2 = useAppStore((s) => s.cycleSynapse2)
+  // Narrow subscriptions: only re-render when the specific params we pass
+  // down actually change. (e.g. bumping trialDuration via leva shouldn't
+  // bust the r3f scene's memo.)
+  const syn1Mode = useAppStore((s) => s.params.syn1Mode)
+  const syn2Mode = useAppStore((s) => s.params.syn2Mode)
+  const wAMPA = useAppStore((s) => s.params.wAMPA)
+  const wNMDA = useAppStore((s) => s.params.wNMDA)
 
   const playback = usePlayback(trial, { initialSpeed: 0.5 })
 
@@ -58,21 +93,29 @@ export default function App() {
 
       <div className="main">
         <div className="canvas-wrap">
-          <NeuronScene
-            voltages={voltages}
-            syn1Mode={params.syn1Mode}
-            syn2Mode={params.syn2Mode}
-            syn1FireT={syn1FireT}
-            syn2FireT={syn2FireT}
-            currentT={playback.playhead}
-            wAMPA1={params.wAMPA}
-            wNMDA1={params.wNMDA}
-            wAMPA2={params.wAMPA}
-            wNMDA2={params.wNMDA}
-            trial={trial}
-            onSyn1Click={cycleSynapse1}
-            onSyn2Click={cycleSynapse2}
-          />
+          <PanelErrorBoundary name="3D scene">
+            <Suspense
+              fallback={
+                <div style={{ padding: '20px', color: '#aaaacc' }}>loading scene…</div>
+              }
+            >
+              <NeuronScene
+                voltages={voltages}
+                syn1Mode={syn1Mode}
+                syn2Mode={syn2Mode}
+                syn1FireT={syn1FireT}
+                syn2FireT={syn2FireT}
+                currentT={playback.playhead}
+                wAMPA1={wAMPA}
+                wNMDA1={wNMDA}
+                wAMPA2={wAMPA}
+                wNMDA2={wNMDA}
+                trial={trial}
+                onSyn1Click={cycleSynapse1}
+                onSyn2Click={cycleSynapse2}
+              />
+            </Suspense>
+          </PanelErrorBoundary>
           <div className="caption-overlay">
             <div className="caption-line">
               <span className="caption-label">playhead</span>
@@ -93,49 +136,61 @@ export default function App() {
         </div>
 
         <aside>
-          <section className="panel">
-            <PlaybackControls playback={playback} />
-          </section>
+          <PanelErrorBoundary name="Playback">
+            <section className="panel">
+              <PlaybackControls playback={playback} />
+            </section>
+          </PanelErrorBoundary>
 
-          <section className="panel">
-            <h2>Voltage trace</h2>
-            <VoltageTrace
-              trial={trial}
-              playhead={playback.playhead}
-              onScrub={(t) => {
-                playback.pause()
-                playback.setPlayhead(t)
-              }}
-            />
-            <p className="caption">
-              Click the trace to scrub the 3D scene through the trial. The
-              dashed cursor shows the current playhead; the label is the soma
-              V at that moment.
-            </p>
-          </section>
+          <PanelErrorBoundary name="Voltage trace">
+            <section className="panel">
+              <h2>Voltage trace</h2>
+              <VoltageTrace
+                trial={trial}
+                playhead={playback.playhead}
+                onScrub={(t) => {
+                  playback.pause()
+                  playback.setPlayhead(t)
+                }}
+              />
+              <p className="caption">
+                Click the trace to scrub the 3D scene through the trial. The
+                dashed cursor shows the current playhead; the label is the soma
+                V at that moment.
+              </p>
+            </section>
+          </PanelErrorBoundary>
 
-          <section className="panel">
-            <PresetsPanel />
-          </section>
+          <PanelErrorBoundary name="Presets">
+            <section className="panel">
+              <PresetsPanel />
+            </section>
+          </PanelErrorBoundary>
 
-          <section className="panel">
-            <h2>Parameters</h2>
-            <ParametersPanel />
-          </section>
+          <PanelErrorBoundary name="Parameters">
+            <section className="panel">
+              <h2>Parameters</h2>
+              <ParametersPanel />
+            </section>
+          </PanelErrorBoundary>
 
-          <section className="panel">
-            <h2>Supralinearity sweep</h2>
-            <SupralinearityPlot sweep={sweep as SweepPoint[] | null} loading={sweepLoading} />
-            <p className="caption">
-              Peak somatic ΔV from a paired-pulse trial, divided by the sum of
-              peak ΔVs from each synapse alone. Peaks at small |ΔT| for
-              NMDA-mediated coincidence detection (Polsky, Mel &amp; Schiller 2004).
-            </p>
-          </section>
+          <PanelErrorBoundary name="Supralinearity sweep">
+            <section className="panel">
+              <h2>Supralinearity sweep</h2>
+              <SupralinearityPlot sweep={sweep as SweepPoint[] | null} loading={sweepLoading} />
+              <p className="caption">
+                Peak somatic ΔV from a paired-pulse trial, divided by the sum of
+                peak ΔVs from each synapse alone. Peaks at small |ΔT| for
+                NMDA-mediated coincidence detection (Polsky, Mel &amp; Schiller 2004).
+              </p>
+            </section>
+          </PanelErrorBoundary>
 
-          <section className="panel">
-            <References />
-          </section>
+          <PanelErrorBoundary name="References">
+            <section className="panel">
+              <References />
+            </section>
+          </PanelErrorBoundary>
         </aside>
       </div>
     </div>

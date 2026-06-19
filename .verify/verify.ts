@@ -18,6 +18,14 @@ import { chromium, type Page } from 'playwright'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 
+declare global {
+  // Mirror of the global declaration in src/main.tsx. The verifier reads
+  // sweep results, params, and the trial trace through this handle.
+  interface Window {
+    __dendriticStore: { getState: () => unknown; setState: (s: unknown) => void }
+  }
+}
+
 const URL = 'http://localhost:5273/'
 const OUT = join(process.cwd(), '.verify')
 mkdirSync(OUT, { recursive: true })
@@ -31,7 +39,6 @@ interface Finding {
 const findings: Finding[] = []
 function report(pass: number, severity: Finding['severity'], note: string): void {
   findings.push({ pass, severity, note })
-  // eslint-disable-next-line no-console
   console.log(`[pass ${pass}] ${severity.padEnd(4)} ${note}`)
 }
 
@@ -334,8 +341,7 @@ async function main(): Promise<void> {
   // sample either lands before the AP or after it has decayed. A peak
   // search over the trace catches the actual maximum.
   const somaPeakResult = await page.evaluate(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const store = (window as any).__dendriticStore
+    const store = window.__dendriticStore
     if (!store) return { peakV: -65, nSamples: 0 }
     const t = store.getState().lastTrial
     if (!t) return { peakV: -65, nSamples: 0 }
@@ -463,10 +469,9 @@ async function main(): Promise<void> {
   // Trigger the sweep via the same store the UI uses. We rely on the
   // window.__dendriticStore handle set up in src/main.tsx.
   const sweepTriggered = await page.evaluate(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const store = (window as any).__dendriticStore
+    const store = window.__dendriticStore
     if (!store) return { ok: false, reason: 'no __dendriticStore on window' }
-    const state = store.getState()
+    const state = store.getState() as { runSweep: () => void }
     state.runSweep()
     return { ok: true, reason: 'runSweep() invoked' }
   })
@@ -483,10 +488,13 @@ async function main(): Promise<void> {
   const sweepDeadline = Date.now() + 30_000
   while (Date.now() < sweepDeadline) {
     const result = await page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const store = (window as any).__dendriticStore
+      const store = window.__dendriticStore
       if (!store) return { loading: true, sweep: null, blowups: 0 }
-      const s = store.getState()
+      const s = store.getState() as {
+        sweepLoading: boolean
+        sweep: unknown[] | null
+        sweepBlowups?: number
+      }
       return { loading: s.sweepLoading, sweep: s.sweep, blowups: s.sweepBlowups ?? 0 }
     })
     if (!result.loading && result.sweep && result.sweep.length > 0) {
