@@ -29,3 +29,8 @@ dist-ssr
 .verify/*.png
 .verify/*.gif
 .verify/gif-frames/
+
+# Docs/screenshots are the canonical tracked copies — the README links to
+# them. The verifier writes fresh copies to .verify/ on every run; we
+# don't want those in git, but we DO want the stable doc screenshots.
+!docs/screenshots/*.png

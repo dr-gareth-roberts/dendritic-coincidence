@@ -90,7 +90,7 @@ g_AMPA(t) = w_AMPA · exp(-t_since_spike / τ_AMPA)     // τ_AMPA = 2 ms
 I_AMPA    = g_AMPA(t) · (E_AMPA - V) · 1e-2            // E_AMPA = 0 mV, surface 1e-4 cm²
 ```
 
-Default `w_AMPA = 4.5 nS` (tunable in UI).
+Default `w_AMPA = 6.0 nS` (tunable in UI).
 
 ### NMDA synapse
 
@@ -101,7 +101,7 @@ B(V)      = 1 / (1 + ([Mg²⁺]/3.57) · exp(-0.062·V))    // [Mg²⁺] = 1 mM
 I_NMDA    = g_NMDA(t) · B(V) · (E_NMDA - V) · 1e-2     // E_NMDA = 0 mV
 ```
 
-Default `w_NMDA = 28 nS` (tunable in UI). The Mg²⁺ block is what makes NMDA
+Default `w_NMDA = 30 nS` (tunable in UI). The Mg²⁺ block is what makes NMDA
 voltage-dependent: at V_rest ≈ -65 mV, B(V) ≈ 0.04 (96% blocked); at V ≈ -20 mV,
 B(V) ≈ 0.5. This nonlinear relief of Mg²⁺ block is the molecular basis of
 dendritic coincidence detection.
@@ -140,43 +140,60 @@ reset that compartment to V_rest.
 ### File layout
 
 ```
-dendritic/
-├── README.md
-├── DESIGN.md (this file)
+dendritic-coincidence/
+├── README.md                     # landing page, hero, screenshots
+├── DESIGN.md                     # this file
+├── LICENSE                       # MIT
 ├── package.json
 ├── tsconfig.json
-├── vite.config.ts
+├── vite.config.ts                # port 5273, strictPort
+├── eslint.config.js
 ├── index.html
+├── docs/
+│   ├── architecture.svg          # 3-panel diagram
+│   └── screenshots/              # tracked PNGs
 └── src/
     ├── main.tsx
     ├── App.tsx
     ├── styles.css
     ├── sim/
-    │   ├── gating.ts
-    │   ├── hh.ts
-    │   ├── cable.ts
-    │   ├── neuron.ts
-    │   ├── synapse.ts
-    │   ├── integrator.ts
-    │   ├── presets.ts
-    │   ├── day1-verify.ts
-    │   ├── day2-verify.ts
-    │   ├── day3-verify.ts
-    │   └── day4-verify.ts
+    │   ├── gating.ts             # Traub-Miles α/β rate functions
+    │   ├── hh.ts                 # HH step + per-compartment params
+    │   ├── cable.ts              # axial coupling (tunable lumped)
+    │   ├── neuron.ts             # 4-compartment orchestrator
+    │   ├── synapse.ts            # AMPA + NMDA, Mg²⁺ block
+    │   ├── integrator.ts         # Forward Euler, blowup guard
+    │   └── presets.ts            # 5 named configurations
     ├── components/
-    │   ├── geometry.ts
-    │   ├── voltageColor.ts
+    │   ├── NeuronScene.tsx       # R3F 3D scene
     │   ├── Compartment.tsx
+    │   ├── Branch.tsx            # tapered cylinder
+    │   ├── Soma.tsx
     │   ├── SynapseHandle.tsx
-    │   ├── NeuronScene.tsx
-    │   ├── VoltageTrace.tsx
+    │   ├── propagation.ts        # VISUAL ART, not biophysics
+    │   ├── voltageColor.ts       # V → RGB
+    │   ├── VoltageTrace.tsx      # Canvas2D traces
     │   ├── SupralinearityPlot.tsx
-    │   ├── Controls.tsx
+    │   ├── PlaybackControls.tsx
     │   ├── PresetsPanel.tsx
+    │   ├── ParametersPanel.tsx   # leva
+    │   ├── playback.ts           # usePlayback hook
     │   └── References.tsx
     └── state/
-        └── store.ts
+        └── store.ts              # zustand
+
+.verify/                          # gitignored output + tracked scripts
+├── verify.ts                     # four-pass visual verifier
+├── capture-gif.ts                # 30-s demo GIF capture
+├── report.txt                    # last verifier output
+└── *.png                         # ephemeral; gitignored
 ```
+
+The legacy `dayN-verify.ts` scripts that bootstrapped each phase of
+the build were removed once the parameters settled. Their findings
+live in the shipped parameter values (in `src/sim/hh.ts`,
+`src/sim/cable.ts`, `src/sim/synapse.ts`) and in the four-pass
+`.verify/verify.ts` gate.
 
 ### Verification script
 
@@ -259,7 +276,7 @@ in-app References panel.
 
 ## Verification (end-to-end, manual)
 
-1. `npm install && npm run dev` → opens `http://localhost:5173`.
+1. `npm install && npm run dev` → opens `http://localhost:5273`.
 2. R3F canvas renders the 4-compartment neuron, resting blue colour.
 3. Select `coincidence` preset.
 4. Press "Run trial" at ΔT = 5 ms → see dendritic depolarisation +

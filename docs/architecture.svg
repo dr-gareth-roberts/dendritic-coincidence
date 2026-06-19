@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 540" font-family="-apple-system, 'Inter', sans-serif">
+  <!--
+    Architecture diagram for the dendritic-coincidence simulator.
+    Three panels: (1) 4-compartment neuron topology + axial couplings,
+    (2) per-compartment ODE block, (3) synapse closed-form equations.
+    Palette matches the live app: dark #0a0a1f, navy text #e0e0f0,
+    orange accent #ffaa44, yellow highlight #ffdd66, dim labels #8888aa.
+  -->
+
+  <defs>
+    <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ffaa44"/>
+    </marker>
+    <marker id="arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64c0ff"/>
+    </marker>
+    <marker id="arrow-violet" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#a48fff"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="540" fill="#0a0a1f"/>
+
+  <!-- Header -->
+  <text x="40" y="40" fill="#ffaa44" font-size="20" font-weight="600">Simulator architecture</text>
+  <text x="40" y="62" fill="#8888aa" font-size="13">4 compartments · 1 ODE per compartment · 2 synapses · Forward-Euler @ dt = 0.01 ms</text>
+
+  <!-- ============================== PANEL 1: TOPOLOGY ============================== -->
+  <g transform="translate(40, 100)">
+    <rect width="320" height="400" fill="#0d0d22" stroke="#2a2a4f" stroke-width="1" rx="6"/>
+    <text x="20" y="28" fill="#ffdd66" font-size="13" font-weight="600">1 · Topology &amp; axial coupling</text>
+    <text x="20" y="48" fill="#8888aa" font-size="11">4 lumped compartments, 3 axial resistors</text>
+
+    <!-- apical tuft -->
+    <circle cx="160" cy="90" r="22" fill="#1a1a3a" stroke="#64c0ff" stroke-width="2"/>
+    <text x="160" y="94" fill="#64c0ff" font-size="11" text-anchor="middle">apical</text>
+    <text x="160" y="108" fill="#64c0ff" font-size="11" text-anchor="middle">tuft</text>
+
+    <!-- apical trunk (cylinder) -->
+    <rect x="148" y="120" width="24" height="120" fill="#1a1a3a" stroke="#64c0ff" stroke-width="2"/>
+    <text x="195" y="180" fill="#64c0ff" font-size="11">apical trunk</text>
+    <text x="195" y="195" fill="#8888aa" font-size="10">g_axial g_at = 0.20</text>
+
+    <!-- synapse handles on trunk -->
+    <circle cx="160" cy="160" r="9" fill="#ffaa44" stroke="#ffdd66" stroke-width="1.5"/>
+    <text x="180" y="155" fill="#ffdd66" font-size="10">syn1</text>
+    <text x="180" y="167" fill="#8888aa" font-size="9">AMPA + NMDA</text>
+
+    <circle cx="160" cy="200" r="9" fill="#ffaa44" stroke="#ffdd66" stroke-width="1.5"/>
+    <text x="180" y="195" fill="#ffdd66" font-size="10">syn2</text>
+    <text x="180" y="207" fill="#8888aa" font-size="9">AMPA + NMDA</text>
+
+    <!-- soma -->
+    <circle cx="160" cy="280" r="26" fill="#1a1a3a" stroke="#ffaa44" stroke-width="2.5"/>
+    <text x="160" y="284" fill="#ffaa44" font-size="12" font-weight="600" text-anchor="middle">soma</text>
+    <text x="195" y="280" fill="#8888aa" font-size="9">g_Na = 40</text>
+    <text x="195" y="293" fill="#8888aa" font-size="9">g_K = 18</text>
+
+    <!-- basal -->
+    <rect x="148" y="310" width="24" height="60" fill="#1a1a3a" stroke="#ff6464" stroke-width="2"/>
+    <text x="180" y="345" fill="#ff6464" font-size="11">basal</text>
+
+    <!-- arrows (axial coupling) -->
+    <line x1="160" y1="112" x2="160" y2="118" stroke="#ffaa44" stroke-width="2" marker-end="url(#arrow-orange)"/>
+    <text x="120" y="115" fill="#ffaa44" font-size="9" text-anchor="end">g_at</text>
+
+    <line x1="160" y1="240" x2="160" y2="252" stroke="#ffaa44" stroke-width="2" marker-end="url(#arrow-orange)"/>
+    <text x="120" y="248" fill="#ffaa44" font-size="9" text-anchor="end">g_st</text>
+
+    <line x1="160" y1="306" x2="160" y2="318" stroke="#ffaa44" stroke-width="2" marker-end="url(#arrow-orange)"/>
+    <text x="120" y="316" fill="#ffaa44" font-size="9" text-anchor="end">g_sb</text>
+
+    <text x="20" y="385" fill="#8888aa" font-size="10">All 4 compartments at V_rest = −65 mV.</text>
+    <text x="20" y="398" fill="#8888aa" font-size="10">Click a synapse to toggle AMPA / NMDA.</text>
+  </g>
+
+  <!-- ============================== PANEL 2: ODE ============================== -->
+  <g transform="translate(400, 100)">
+    <rect width="380" height="400" fill="#0d0d22" stroke="#2a2a4f" stroke-width="1" rx="6"/>
+    <text x="20" y="28" fill="#ffdd66" font-size="13" font-weight="600">2 · Per-compartment ODE</text>
+    <text x="20" y="48" fill="#8888aa" font-size="11">HH gating on every compartment</text>
+
+    <!-- Main equation -->
+    <text x="30" y="92" fill="#e0e0f0" font-size="14" font-family="ui-monospace, monospace">C</text>
+    <text x="50" y="98" fill="#ffaa44" font-size="13" font-family="ui-monospace, monospace">dV<tspan baseline-shift="sub" font-size="10">i</tspan>/dt</text>
+    <text x="100" y="92" fill="#e0e0f0" font-size="14" font-family="ui-monospace, monospace">=</text>
+
+    <!-- I_ion term -->
+    <text x="30" y="128" fill="#e0e0f0" font-size="13" font-family="ui-monospace, monospace">−  g_Na m³h (V − E_Na)</text>
+    <text x="30" y="148" fill="#e0e0f0" font-size="13" font-family="ui-monospace, monospace">−  g_K n⁴ (V − E_K)</text>
+    <text x="30" y="168" fill="#e0e0f0" font-size="13" font-family="ui-monospace, monospace">−  g_L (V − E_L)</text>
+
+    <!-- I_axial term -->
+    <text x="30" y="200" fill="#e0e0f0" font-size="13" font-family="ui-monospace, monospace">+  Σ<tspan baseline-shift="sub" font-size="10">j∈N(i)</tspan> g_ij (V<tspan baseline-shift="sub" font-size="10">j</tspan> − V<tspan baseline-shift="sub" font-size="10">i</tspan>)</text>
+    <text x="190" y="220" fill="#8888aa" font-size="10">← axial current from neighbours</text>
+
+    <!-- I_syn term -->
+    <text x="30" y="248" fill="#e0e0f0" font-size="13" font-family="ui-monospace, monospace">+  I_AMPA(t, V)  +  I_NMDA(t, V)</text>
+    <text x="190" y="268" fill="#8888aa" font-size="10">← synaptic input (panel 3)</text>
+
+    <!-- Gating dynamics -->
+    <line x1="20" y1="290" x2="360" y2="290" stroke="#2a2a4f" stroke-width="1"/>
+    <text x="30" y="310" fill="#ffdd66" font-size="11">Gating (Traub–Miles, V in mV, rates in 1/ms):</text>
+    <text x="30" y="332" fill="#8888aa" font-size="10" font-family="ui-monospace, monospace">α<tspan baseline-shift="sub" font-size="8">m</tspan>(V) = 0.32 (V+54) / (1 − e<tspan baseline-shift="super" font-size="8">−(V+54)/4</tspan>)</text>
+    <text x="30" y="350" fill="#8888aa" font-size="10" font-family="ui-monospace, monospace">α<tspan baseline-shift="sub" font-size="8">h</tspan>(V) = 0.128 e<tspan baseline-shift="super" font-size="8">−(V+50)/18</tspan></text>
+    <text x="30" y="368" fill="#8888aa" font-size="10" font-family="ui-monospace, monospace">α<tspan baseline-shift="sub" font-size="8">n</tspan>(V) = 0.032 (V+52) / (1 − e<tspan baseline-shift="super" font-size="8">−(V+52)/5</tspan>)</text>
+
+    <text x="30" y="395" fill="#8888aa" font-size="9">Forward-Euler step: V, m, h, n all updated with dt = 0.01 ms.</text>
+  </g>
+
+  <!-- ============================== PANEL 3: SYNAPSES ============================== -->
+  <g transform="translate(820, 100)">
+    <rect width="420" height="400" fill="#0d0d22" stroke="#2a2a4f" stroke-width="1" rx="6"/>
+    <text x="20" y="28" fill="#ffdd66" font-size="13" font-weight="600">3 · Synapse closed-form currents</text>
+    <text x="20" y="48" fill="#8888aa" font-size="11">No stateful ODE — conductance evaluated at every step</text>
+
+    <!-- AMPA -->
+    <text x="20" y="80" fill="#88ff88" font-size="13" font-weight="600">AMPA</text>
+    <text x="20" y="100" fill="#e0e0f0" font-size="12" font-family="ui-monospace, monospace">g<tspan baseline-shift="sub" font-size="9">AMPA</tspan>(t) = w · e<tspan baseline-shift="super" font-size="9">−t/τ</tspan>,     τ = 2 ms</text>
+    <text x="20" y="118" fill="#e0e0f0" font-size="12" font-family="ui-monospace, monospace">I<tspan baseline-shift="sub" font-size="9">AMPA</tspan>  = g<tspan baseline-shift="sub" font-size="9">AMPA</tspan>(t) · (E<tspan baseline-shift="sub" font-size="9">AMPA</tspan> − V),     E = 0 mV</text>
+    <text x="20" y="138" fill="#8888aa" font-size="10">fast, voltage-independent, fast decay (~10 ms)</text>
+
+    <!-- NMDA -->
+    <line x1="20" y1="158" x2="400" y2="158" stroke="#2a2a4f" stroke-width="1"/>
+
+    <text x="20" y="180" fill="#ff8866" font-size="13" font-weight="600">NMDA — voltage-dependent (the coincidence detector)</text>
+    <text x="20" y="200" fill="#e0e0f0" font-size="12" font-family="ui-monospace, monospace">g<tspan baseline-shift="sub" font-size="9">NMDA</tspan>(t) = w · [0.4 e<tspan baseline-shift="super" font-size="9">−t/50</tspan> + 0.6 e<tspan baseline-shift="super" font-size="9">−t/250</tspan>]</text>
+    <text x="20" y="220" fill="#8888aa" font-size="10">double-exp: NR2A-fast (50 ms) + NR2B-slow (250 ms)</text>
+
+    <text x="20" y="252" fill="#ffaa44" font-size="13" font-weight="600">Mg²⁺ block  (Jahr–Stevens 1990)</text>
+    <text x="20" y="272" fill="#e0e0f0" font-size="12" font-family="ui-monospace, monospace">B(V) = 1 / (1 + ([Mg²⁺]/3.57) · e<tspan baseline-shift="super" font-size="9">−0.062 V</tspan>)</text>
+    <text x="20" y="290" fill="#e0e0f0" font-size="12" font-family="ui-monospace, monospace">I<tspan baseline-shift="sub" font-size="9">NMDA</tspan>  = g<tspan baseline-shift="sub" font-size="9">NMDA</tspan>(t) · B(V) · (E − V)</text>
+
+    <!-- B(V) table -->
+    <line x1="20" y1="306" x2="400" y2="306" stroke="#2a2a4f" stroke-width="1"/>
+    <text x="20" y="326" fill="#8888aa" font-size="10">B(−65 mV) ≈ 0.04   →   96% blocked at rest</text>
+    <text x="20" y="344" fill="#8888aa" font-size="10">B(−20 mV) ≈ 0.5    →   half unblocked</text>
+    <text x="20" y="362" fill="#8888aa" font-size="10">B(  0 mV) ≈ 0.9    →   almost fully open</text>
+
+    <text x="20" y="388" fill="#ffdd66" font-size="10">The nonlinear relief of Mg²⁺ block is the molecular basis</text>
+    <text x="20" y="398" fill="#ffdd66" font-size="10">of dendritic coincidence detection.</text>
+  </g>
+</svg>
